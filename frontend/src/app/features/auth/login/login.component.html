@@ -1,0 +1,72 @@
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="logo">
+        <span class="logo-icon">💰</span>
+        <h1>Financial Approval System</h1>
+      </div>
+      <p class="subtitle">Sign in to your account</p>
+    </div>
+
+    <form (ngSubmit)="onSubmit()" class="auth-form">
+      <div class="form-group" *ngIf="errorMessage">
+        <div class="error-alert">
+          <span>⚠️</span> {{ errorMessage }}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input
+          type="email"
+          id="email"
+          [(ngModel)]="email"
+          name="email"
+          placeholder="Enter your email"
+          autocomplete="email"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          [(ngModel)]="password"
+          name="password"
+          placeholder="Enter your password"
+          autocomplete="current-password"
+          required
+        />
+      </div>
+
+      <button type="submit" class="btn-primary" [disabled]="isLoading">
+        <span *ngIf="!isLoading">Sign In</span>
+        <span *ngIf="isLoading" class="spinner"></span>
+      </button>
+    </form>
+
+    <div class="demo-accounts">
+      <div class="demo-title">⚡ Quick Demo Accounts (1-click sign in):</div>
+      <div class="demo-buttons">
+        <button type="button" class="demo-btn" (click)="quickLogin('employee@company.com')">
+          👤 Alice (Employee)
+        </button>
+        <button type="button" class="demo-btn" (click)="quickLogin('manager@company.com')">
+          👔 Bob (Manager)
+        </button>
+        <button type="button" class="demo-btn" (click)="quickLogin('finance@company.com')">
+          📊 Carol (Finance)
+        </button>
+        <button type="button" class="demo-btn" (click)="quickLogin('director@company.com')">
+          👑 David (Director)
+        </button>
+      </div>
+    </div>
+
+    <div class="auth-footer">
+      <p>Don't have an account? <a routerLink="/register">Create one</a></p>
+    </div>
+  </div>
+</div>

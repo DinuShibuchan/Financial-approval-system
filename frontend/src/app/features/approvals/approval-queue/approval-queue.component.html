@@ -1,0 +1,163 @@
+<div class="queue-layout">
+  <!-- Header Section -->
+  <div class="header-section">
+    <div>
+      <div class="breadcrumbs">
+        <a routerLink="/dashboard">Dashboard</a>
+        <span>/</span>
+        <span class="active">Approval Inbox</span>
+      </div>
+      <h1>Pending Approvals Queue</h1>
+      <p class="subtitle">Requests awaiting your authorization based on your active management roles</p>
+    </div>
+
+    <div class="badge-counter" *ngIf="!isLoading">
+      <span class="counter-number">{{ pendingRequests.length }}</span>
+      <span class="counter-label">Awaiting Signoff</span>
+    </div>
+  </div>
+
+  <!-- Role Capabilities Bar -->
+  <div class="roles-bar" *ngIf="authService.currentUser">
+    <span class="roles-label">Your Authorizer Permissions:</span>
+    <div class="roles-list">
+      <span 
+        *ngFor="let role of authService.currentUser.roles" 
+        class="badge" 
+        [ngClass]="'badge-' + role.toLowerCase()">
+        {{ role }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Error Alert -->
+  <div class="alert-box" *ngIf="errorMessage">
+    <span>⚠️</span> {{ errorMessage }}
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="spinner-large"></div>
+    <p>Loading your approval queue...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-card" *ngIf="!isLoading && pendingRequests.length === 0">
+    <div class="empty-icon">🎉</div>
+    <h3>All Caught Up!</h3>
+    <p>There are no financial requests currently waiting for your review. Check back later as team members submit new expenditures.</p>
+    <a routerLink="/requests" class="btn-secondary">
+      View All Organization Requests
+    </a>
+  </div>
+
+  <!-- Queue Cards / Table -->
+  <div class="queue-grid" *ngIf="!isLoading && pendingRequests.length > 0">
+    <div class="queue-item-card" *ngFor="let req of pendingRequests">
+      <div class="card-top">
+        <div class="item-ref">
+          <span class="type-icon">{{ req.request_type === 'EXPENSE' ? '💳' : (req.request_type === 'PURCHASE' ? '🛍️' : '✈️') }}</span>
+          <div>
+            <a [routerLink]="['/requests', req.id]" class="req-number">{{ req.request_number }}</a>
+            <span class="req-date">{{ req.created_at | date:'mediumDate' }}</span>
+          </div>
+        </div>
+
+        <div class="item-amount">
+          <span class="amount-val">₹{{ req.amount | number:'1.2-2' }}</span>
+          <span class="badge" [ngClass]="getLevelBadge(req.current_approval_level)">
+            {{ getLevelRole(req.current_approval_level) }}
+          </span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="requester-info">
+          <span class="avatar">{{ (req.requested_by_name || 'U').charAt(0) }}</span>
+          <span class="name">Requested by: <strong>{{ req.requested_by_name || 'User #' + req.requested_by }}</strong></span>
+        </div>
+        <p class="description">{{ req.description }}</p>
+      </div>
+
+      <div class="card-footer">
+        <a [routerLink]="['/requests', req.id]" class="btn-view">
+          👁️ Full Details
+        </a>
+
+        <div class="decision-buttons">
+          <button class="btn-reject" (click)="openReject(req)" [disabled]="isActionLoading">
+            ✕ Reject
+          </button>
+          <button class="btn-approve" (click)="openApprove(req)" [disabled]="isActionLoading">
+            ✓ Approve
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPROVE MODAL -->
+  <div class="modal-overlay" *ngIf="showApproveModal && selectedRequest">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Confirm Approval</h3>
+        <button class="btn-close" (click)="showApproveModal = false">✕</button>
+      </div>
+      <p class="modal-sub">
+        Approve request <strong>{{ selectedRequest.request_number }}</strong> for ₹{{ selectedRequest.amount | number:'1.2-2' }}?
+      </p>
+
+      <div class="form-group">
+        <label for="approvalNote">Internal Comments (Optional)</label>
+        <textarea 
+          id="approvalNote" 
+          rows="3" 
+          [(ngModel)]="actionNote" 
+          placeholder="Add comments, approvals note, or cost-code references..."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="showApproveModal = false" [disabled]="isActionLoading">
+          Cancel
+        </button>
+        <button class="btn-approve-confirm" (click)="confirmApprove()" [disabled]="isActionLoading">
+          <span *ngIf="!isActionLoading">Authorize Request</span>
+          <span *ngIf="isActionLoading" class="spinner"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REJECT MODAL -->
+  <div class="modal-overlay" *ngIf="showRejectModal && selectedRequest">
+    <div class="modal-card reject-modal">
+      <div class="modal-header">
+        <h3>Reject Request</h3>
+        <button class="btn-close" (click)="showRejectModal = false">✕</button>
+      </div>
+      <p class="modal-sub">
+        Rejecting request <strong>{{ selectedRequest.request_number }}</strong>. A detailed reason is <strong>mandatory</strong>.
+      </p>
+
+      <div class="form-group">
+        <label for="queueRejectReason">Reason for Rejection *</label>
+        <textarea 
+          id="queueRejectReason" 
+          rows="3" 
+          [(ngModel)]="rejectionReason" 
+          placeholder="Specify clear reasons for denial (budget exceeded, policy violation, insufficient documentation)..."
+          required></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="showRejectModal = false" [disabled]="isActionLoading">
+          Cancel
+        </button>
+        <button class="btn-reject-confirm" (click)="confirmReject()" [disabled]="isActionLoading">
+          <span *ngIf="!isActionLoading">Confirm Rejection</span>
+          <span *ngIf="isActionLoading" class="spinner"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

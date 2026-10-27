@@ -1,0 +1,139 @@
+<div class="form-container">
+  <div class="form-header">
+    <a routerLink="/requests" class="back-link">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+      Back to Requests
+    </a>
+    <h1>{{ isEditMode ? 'Edit Draft Request' : 'New Financial Request' }}</h1>
+    <p class="subtitle">Specify the expense details, category, and amount for multi-level review</p>
+  </div>
+
+  <div class="form-card">
+    <div class="error-alert" *ngIf="errorMessage">
+      <span>⚠️</span> {{ errorMessage }}
+    </div>
+
+    <!-- Request Type Selector -->
+    <div class="section-group">
+      <label class="section-label">Select Request Category</label>
+      <div class="type-selector">
+        <button 
+          type="button" 
+          class="type-pill" 
+          [class.active]="requestType === 'EXPENSE'"
+          (click)="requestType = 'EXPENSE'">
+          <span class="type-icon">💳</span>
+          <div class="type-meta">
+            <span class="type-name">Expense</span>
+            <span class="type-sub">Operational &amp; Reimbursement</span>
+          </div>
+        </button>
+
+        <button 
+          type="button" 
+          class="type-pill" 
+          [class.active]="requestType === 'PURCHASE'"
+          (click)="requestType = 'PURCHASE'">
+          <span class="type-icon">🛍️</span>
+          <div class="type-meta">
+            <span class="type-name">Purchase</span>
+            <span class="type-sub">Equipment, Software &amp; Assets</span>
+          </div>
+        </button>
+
+        <button 
+          type="button" 
+          class="type-pill" 
+          [class.active]="requestType === 'TRAVEL'"
+          (click)="requestType = 'TRAVEL'">
+          <span class="type-icon">✈️</span>
+          <div class="type-meta">
+            <span class="type-name">Travel</span>
+            <span class="type-sub">Flights, Hotels &amp; Per Diem</span>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Amount Input -->
+    <div class="form-group">
+      <label for="amount">Request Amount (₹ INR)</label>
+      <div class="input-with-prefix">
+        <span class="currency-symbol">₹</span>
+        <input 
+          type="number" 
+          id="amount" 
+          [(ngModel)]="amount" 
+          placeholder="0.00" 
+          min="1"
+          step="any"
+          required />
+      </div>
+      <span class="input-hint">Thresholds: &lt; ₹10,000 (Mgr), ₹10k–₹50k (+Fin), &gt; ₹50k (+Dir)</span>
+    </div>
+
+    <!-- Dynamic Live Approval Chain Preview -->
+    <div class="approval-chain-box" [class.active-box]="(amount || 0) > 0">
+      <div class="chain-header">
+        <span class="chain-tag">{{ tierInfo.title }}</span>
+        <span class="chain-desc">{{ tierInfo.description }}</span>
+      </div>
+
+      <div class="chain-badges" *ngIf="tierInfo.approvers.length > 0">
+        <div class="approver-flow">
+          <ng-container *ngFor="let approver of tierInfo.approvers; let last = last; let i = index">
+            <div class="step-badge">
+              <span class="step-num">{{ i + 1 }}</span>
+              <span class="badge" [ngClass]="'badge-' + approver.toLowerCase()">{{ approver }}</span>
+            </div>
+            <span class="flow-arrow" *ngIf="!last">➔</span>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+
+    <!-- Justification / Description -->
+    <div class="form-group">
+      <label for="description">Business Justification &amp; Purpose</label>
+      <textarea 
+        id="description" 
+        rows="4" 
+        [(ngModel)]="description" 
+        placeholder="Provide comprehensive details, vendor info, dates, and purpose of this expenditure..."
+        required></textarea>
+    </div>
+
+    <!-- Actions -->
+    <div class="form-actions">
+      <button 
+        type="button" 
+        class="btn-secondary" 
+        routerLink="/requests"
+        [disabled]="isLoading">
+        Cancel
+      </button>
+
+      <div class="primary-actions">
+        <button 
+          type="button" 
+          class="btn-draft" 
+          (click)="save(false)"
+          [disabled]="isLoading">
+          Save as Draft
+        </button>
+
+        <button 
+          type="button" 
+          class="btn-primary" 
+          (click)="save(true)"
+          [disabled]="isLoading">
+          <span *ngIf="!isLoading">🚀 Submit for Approval</span>
+          <span *ngIf="isLoading" class="spinner"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

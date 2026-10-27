@@ -1,0 +1,280 @@
+<div class="detail-container" *ngIf="request">
+  <!-- Header Bar -->
+  <div class="detail-header">
+    <div class="header-left">
+      <a routerLink="/requests" class="back-link">
+        ← Back to Requests
+      </a>
+      <div class="title-row">
+        <h1 class="req-title">{{ request.request_number }}</h1>
+        <span class="status-badge" [ngClass]="'status-' + request.status.toLowerCase()">
+          {{ request.status.replace('_', ' ') }}
+        </span>
+      </div>
+      <span class="category-pill">{{ request.request_type }}</span>
+    </div>
+
+    <div class="header-right">
+      <div class="amount-card">
+        <span class="amount-label">Requested Amount</span>
+        <span class="amount-val">₹{{ request.amount | number:'1.2-2' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approver Decision Banner (when current user has authority to act) -->
+  <div class="approver-action-card" *ngIf="canCurrentUserApprove">
+    <div class="action-card-text">
+      <div class="badge-role">Action Required: {{ currentLevelRoleName }} Review</div>
+      <h3>You are authorized to review Level {{ request.current_approval_level }}</h3>
+      <p>Verify budget and justification. Approving advances the workflow or completes final authorization.</p>
+    </div>
+    <div class="action-card-buttons">
+      <button class="btn-approve" (click)="openApproveModal()" [disabled]="isActionLoading">
+        <span>✓ Approve</span>
+      </button>
+      <button class="btn-reject" (click)="openRejectModal()" [disabled]="isActionLoading">
+        <span>✕ Reject</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Self-approval notice if owner tries to view pending request -->
+  <div class="notice-card warning" *ngIf="isOwner && request.status === 'PENDING_APPROVAL'">
+    <span class="notice-icon">🔒</span>
+    <div>
+      <strong>Self-Approval Prevention Active</strong>
+      <p>In accordance with internal governance policies, you cannot authorize your own financial requests. This request is assigned to your level approver.</p>
+    </div>
+  </div>
+
+  <!-- Error / Status Notice -->
+  <div class="alert-box" *ngIf="errorMessage">
+    <span>⚠️</span> {{ errorMessage }}
+  </div>
+
+  <!-- Approval Pipeline Stepper -->
+  <div class="pipeline-card" *ngIf="tierInfo">
+    <div class="card-title">
+      <h3>Multi-Level Approval Pipeline</h3>
+      <span class="tier-tag">{{ tierInfo.title }}</span>
+    </div>
+
+    <div class="stepper">
+      <!-- Step 1: Manager -->
+      <div class="step-item" [ngClass]="getStepStatus(1)">
+        <div class="step-circle">
+          <span *ngIf="getStepStatus(1) === 'completed'">✓</span>
+          <span *ngIf="getStepStatus(1) === 'rejected'">✕</span>
+          <span *ngIf="getStepStatus(1) !== 'completed' && getStepStatus(1) !== 'rejected'">1</span>
+        </div>
+        <div class="step-content">
+          <span class="step-role">Manager Review</span>
+          <span class="step-state">
+            {{ getStepStatus(1) === 'completed' ? 'Approved' : (getStepStatus(1) === 'active' ? 'Under Review' : (getStepStatus(1) === 'rejected' ? 'Rejected' : 'Pending')) }}
+          </span>
+        </div>
+      </div>
+
+      <div class="step-connector" [class.filled]="request.current_approval_level > 1 || request.status === 'APPROVED'" *ngIf="tierInfo.tier >= 2"></div>
+
+      <!-- Step 2: Finance (if >= 2) -->
+      <div class="step-item" [ngClass]="getStepStatus(2)" *ngIf="tierInfo.tier >= 2">
+        <div class="step-circle">
+          <span *ngIf="getStepStatus(2) === 'completed'">✓</span>
+          <span *ngIf="getStepStatus(2) === 'rejected'">✕</span>
+          <span *ngIf="getStepStatus(2) !== 'completed' && getStepStatus(2) !== 'rejected'">2</span>
+        </div>
+        <div class="step-content">
+          <span class="step-role">Finance Review</span>
+          <span class="step-state">
+            {{ getStepStatus(2) === 'completed' ? 'Approved' : (getStepStatus(2) === 'active' ? 'Under Review' : (getStepStatus(2) === 'rejected' ? 'Rejected' : 'Waiting on Level 1')) }}
+          </span>
+        </div>
+      </div>
+
+      <div class="step-connector" [class.filled]="request.current_approval_level > 2 || request.status === 'APPROVED'" *ngIf="tierInfo.tier >= 3"></div>
+
+      <!-- Step 3: Director (if >= 3) -->
+      <div class="step-item" [ngClass]="getStepStatus(3)" *ngIf="tierInfo.tier >= 3">
+        <div class="step-circle">
+          <span *ngIf="getStepStatus(3) === 'completed'">✓</span>
+          <span *ngIf="getStepStatus(3) === 'rejected'">✕</span>
+          <span *ngIf="getStepStatus(3) !== 'completed' && getStepStatus(3) !== 'rejected'">3</span>
+        </div>
+        <div class="step-content">
+          <span class="step-role">Director Review</span>
+          <span class="step-state">
+            {{ getStepStatus(3) === 'completed' ? 'Approved' : (getStepStatus(3) === 'active' ? 'Under Review' : (getStepStatus(3) === 'rejected' ? 'Rejected' : 'Waiting on Level 2')) }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Information Card -->
+  <div class="info-card">
+    <h3>Request Overview</h3>
+    <div class="info-grid">
+      <div class="info-item">
+        <span class="item-label">Requested By</span>
+        <span class="item-val">{{ request.requested_by_name || 'User #' + request.requested_by }}</span>
+      </div>
+
+      <div class="info-item">
+        <span class="item-label">Submission Date</span>
+        <span class="item-val">{{ request.created_at | date:'medium' }}</span>
+      </div>
+
+      <div class="info-item">
+        <span class="item-label">Last Updated</span>
+        <span class="item-val">{{ request.updated_at | date:'medium' }}</span>
+      </div>
+
+      <div class="info-item">
+        <span class="item-label">Current Stage</span>
+        <span class="item-val">
+          {{ request.status === 'PENDING_APPROVAL' ? 'Level ' + request.current_approval_level + ' (' + currentLevelRoleName + ')' : request.status }}
+        </span>
+      </div>
+    </div>
+
+    <div class="desc-section">
+      <span class="item-label">Justification &amp; Purpose</span>
+      <p class="desc-text">{{ request.description }}</p>
+    </div>
+  </div>
+
+  <!-- Approval Audit History Log -->
+  <div class="info-card history-card">
+    <div class="history-header">
+      <h3>Approval History &amp; Audit Trail</h3>
+      <span class="history-count">{{ history.length }} Events</span>
+    </div>
+
+    <div class="empty-history" *ngIf="history.length === 0">
+      <p>No authorization decisions have been recorded for this request yet.</p>
+    </div>
+
+    <div class="timeline" *ngIf="history.length > 0">
+      <div class="timeline-item" *ngFor="let h of history" [ngClass]="h.action.toLowerCase()">
+        <div class="timeline-marker">
+          <span *ngIf="h.action === 'APPROVED'">✓</span>
+          <span *ngIf="h.action === 'REJECTED'">✕</span>
+        </div>
+        <div class="timeline-body">
+          <div class="timeline-top">
+            <span class="approver-name">{{ h.approved_by_name || 'Approver #' + h.approved_by }}</span>
+            <span class="badge" [ngClass]="'badge-' + (h.approval_level === 1 ? 'manager' : (h.approval_level === 2 ? 'finance' : 'director'))">
+              Level {{ h.approval_level }}
+            </span>
+            <span class="action-tag" [ngClass]="'action-' + h.action.toLowerCase()">
+              {{ h.action }}
+            </span>
+            <span class="timeline-time">{{ h.acted_at | date:'medium' }}</span>
+          </div>
+
+          <div class="timeline-reason" *ngIf="h.reason">
+            <span class="reason-label">{{ h.action === 'REJECTED' ? 'Rejection Reason:' : 'Note:' }}</span>
+            <p>{{ h.reason }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Owner Action Panel (for Drafts or Cancelling) -->
+  <div class="actions-panel" *ngIf="isOwner && (request.status === 'DRAFT' || request.status === 'PENDING_APPROVAL')">
+    <div class="actions-left">
+      <span class="actions-hint">Requester actions</span>
+    </div>
+
+    <div class="actions-right">
+      <ng-container *ngIf="request.status === 'DRAFT'">
+        <a [routerLink]="['/requests', request.id, 'edit']" class="btn-edit">
+          ✏️ Edit Draft
+        </a>
+        <button (click)="submitDraft()" class="btn-submit">
+          🚀 Submit for Approval
+        </button>
+      </ng-container>
+
+      <button 
+        *ngIf="request.status === 'PENDING_APPROVAL'" 
+        (click)="cancelRequest()" 
+        class="btn-cancel">
+        🚫 Cancel Request
+      </button>
+    </div>
+  </div>
+
+  <!-- APPROVAL CONFIRMATION MODAL -->
+  <div class="modal-overlay" *ngIf="showApproveModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Authorize Request</h3>
+        <button class="btn-close" (click)="showApproveModal = false">✕</button>
+      </div>
+      <p class="modal-sub">
+        You are approving this request as <strong>{{ currentLevelRoleName }}</strong> for ₹{{ request.amount | number:'1.2-2' }}.
+      </p>
+      
+      <div class="form-group">
+        <label for="approvalNote">Comments / Internal Note (Optional)</label>
+        <textarea 
+          id="approvalNote" 
+          rows="3" 
+          [(ngModel)]="actionNote" 
+          placeholder="Add any validation remarks or cost-center notes..."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="showApproveModal = false" [disabled]="isActionLoading">
+          Cancel
+        </button>
+        <button class="btn-approve-confirm" (click)="confirmApprove()" [disabled]="isActionLoading">
+          <span *ngIf="!isActionLoading">Confirm &amp; Approve</span>
+          <span *ngIf="isActionLoading" class="spinner"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REJECTION REASON MODAL -->
+  <div class="modal-overlay" *ngIf="showRejectModal">
+    <div class="modal-card reject-modal">
+      <div class="modal-header">
+        <h3>Reject Financial Request</h3>
+        <button class="btn-close" (click)="showRejectModal = false">✕</button>
+      </div>
+      <p class="modal-sub">
+        Rejections terminate the request workflow immediately. In compliance with policy, a clear reason is <strong>mandatory</strong>.
+      </p>
+      
+      <div class="form-group">
+        <label for="rejectReason">Reason for Rejection *</label>
+        <textarea 
+          id="rejectReason" 
+          rows="3" 
+          [(ngModel)]="rejectionReason" 
+          placeholder="State explicitly why this expenditure is denied (e.g. over-budget, missing invoice, non-compliant)..."
+          required></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="showRejectModal = false" [disabled]="isActionLoading">
+          Cancel
+        </button>
+        <button class="btn-reject-confirm" (click)="confirmReject()" [disabled]="isActionLoading">
+          <span *ngIf="!isActionLoading">Confirm Rejection</span>
+          <span *ngIf="isActionLoading" class="spinner"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loading-state" *ngIf="isLoading">
+  <div class="spinner-large"></div>
+  <p>Loading request details...</p>
+</div>

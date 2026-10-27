@@ -1,0 +1,38 @@
+# Binaries and executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+backend/server.exe
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+backend/*.db
+backend/*.db-*
+
+# Environment variables
+.env
+backend/.env
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Angular build artifacts
+dist/
+frontend/dist/
+.angular/
+frontend/.angular/
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

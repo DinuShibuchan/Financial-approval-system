@@ -1,0 +1,274 @@
+<div class="dashboard-layout">
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="nav-brand">
+        <div class="brand-icon">💎</div>
+        <div class="brand-text">
+          <span class="brand-name">FinFlow</span>
+          <span class="brand-sub">Approval Engine</span>
+        </div>
+      </div>
+
+      <nav class="nav-links">
+        <a routerLink="/dashboard" class="nav-link active">Dashboard</a>
+        <a routerLink="/requests" class="nav-link">Requests</a>
+        <a 
+          *ngIf="authService.hasAnyRole(['MANAGER', 'FINANCE', 'DIRECTOR'])" 
+          routerLink="/approvals" 
+          class="nav-link">
+          ⚡ Approval Inbox
+        </a>
+        <a routerLink="/reports" class="nav-link">📈 Reports</a>
+      </nav>
+    </div>
+
+    <div class="nav-user" *ngIf="currentUser">
+      <a routerLink="/requests/new" class="btn-new-header">
+        <span>+ New Request</span>
+      </a>
+
+      <div class="user-info">
+        <span class="user-name">{{ currentUser.name }}</span>
+        <div class="user-roles">
+          <span 
+            *ngFor="let role of currentUser.roles" 
+            class="badge" 
+            [ngClass]="getRoleBadgeClass(role)">
+            {{ role }}
+          </span>
+        </div>
+      </div>
+      <button class="btn-logout" (click)="logout()" title="Sign out">
+        <span>Sign Out</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="dashboard-content">
+    <!-- Welcome Banner -->
+    <div class="welcome-card" *ngIf="currentUser">
+      <div class="welcome-text">
+        <h1>Welcome back, {{ currentUser.name }}! 👋</h1>
+        <p>Real-time financial analytics, workflow authorization telemetry, and expenditure tracking.</p>
+        
+        <div class="welcome-quick-actions">
+          <a routerLink="/requests/new" class="action-btn primary">
+            <span>✨ Create Request</span>
+          </a>
+          <a routerLink="/requests" class="action-btn secondary">
+            <span>📋 My Requests</span>
+          </a>
+          <a 
+            *ngIf="authService.hasAnyRole(['MANAGER', 'FINANCE', 'DIRECTOR'])"
+            routerLink="/approvals" 
+            class="action-btn highlight">
+            <span>⚡ Approvals Queue</span>
+          </a>
+          <a routerLink="/reports" class="action-btn outline">
+            <span>📊 Analytics &amp; Reports</span>
+          </a>
+        </div>
+      </div>
+      <div class="user-meta-pill">
+        <span class="meta-label">User ID:</span>
+        <span class="meta-val">#{{ currentUser.id }}</span>
+        <span class="meta-separator">•</span>
+        <span class="meta-val">{{ currentUser.email }}</span>
+      </div>
+    </div>
+
+    <!-- Live KPI Summary Cards Grid -->
+    <div class="kpi-grid" *ngIf="summary">
+      <div class="kpi-card">
+        <div class="kpi-icon-box bg-purple">📊</div>
+        <div class="kpi-details">
+          <span class="kpi-label">Total Requests</span>
+          <span class="kpi-value">{{ summary.total_requests }}</span>
+          <span class="kpi-sub">Total ₹{{ summary.total_amount | number:'1.0-0' }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon-box bg-amber">⏳</div>
+        <div class="kpi-details">
+          <span class="kpi-label">Pending Review</span>
+          <span class="kpi-value">{{ summary.pending_requests }}</span>
+          <span class="kpi-sub highlight-amber">Volume ₹{{ summary.pending_amount | number:'1.0-0' }}</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon-box bg-emerald">✅</div>
+        <div class="kpi-details">
+          <span class="kpi-label">Authorized Outlay</span>
+          <span class="kpi-value">₹{{ summary.approved_amount | number:'1.0-0' }}</span>
+          <span class="kpi-sub highlight-emerald">{{ summary.approved_requests }} Approved</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon-box bg-rose">❌</div>
+        <div class="kpi-details">
+          <span class="kpi-label">Rejected Requests</span>
+          <span class="kpi-value">{{ summary.rejected_requests }}</span>
+          <span class="kpi-sub">Drafts: {{ summary.draft_requests }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics & Breakdown Section -->
+    <div class="analytics-row">
+      <!-- Category Breakdown Chart Card -->
+      <div class="chart-card">
+        <div class="card-header">
+          <div class="title-with-icon">
+            <span class="icon">📈</span>
+            <h3>Expenditure by Category</h3>
+          </div>
+          <span class="badge badge-employee">Distribution</span>
+        </div>
+
+        <div class="category-bars">
+          <div class="category-item" *ngFor="let cat of categoryBreakdown">
+            <div class="cat-header">
+              <span class="cat-title">
+                {{ getTypeIcon(cat.type) }} {{ cat.type }}
+              </span>
+              <span class="cat-amount">₹{{ cat.total_amount | number:'1.2-2' }} ({{ cat.percentage | number:'1.1-1' }}%)</span>
+            </div>
+            <div class="progress-bar-track">
+              <div 
+                class="progress-bar-fill" 
+                [ngClass]="'fill-' + cat.type.toLowerCase()"
+                [style.width.%]="cat.percentage > 0 ? cat.percentage : 3"></div>
+            </div>
+            <div class="cat-count">{{ cat.count }} transactions</div>
+          </div>
+
+          <div class="empty-state-mini" *ngIf="categoryBreakdown.length === 0">
+            <p>No category spending recorded yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Threshold Tier Distribution Card -->
+      <div class="chart-card">
+        <div class="card-header">
+          <div class="title-with-icon">
+            <span class="icon">⚖️</span>
+            <h3>Amount Tier Breakdown</h3>
+          </div>
+          <span class="badge badge-manager">Thresholds</span>
+        </div>
+
+        <div class="tier-list">
+          <div class="tier-item" *ngFor="let t of tierBreakdown" [ngClass]="'tier-style-' + t.tier">
+            <div class="tier-top">
+              <span class="tier-name-tag">{{ t.tier_name }} ({{ t.range_label }})</span>
+              <span class="tier-sum">₹{{ t.total_amount | number:'1.2-2' }}</span>
+            </div>
+            <div class="tier-meta">
+              <span>Required: <strong>{{ t.approver }}</strong></span>
+              <span>{{ t.count }} requests</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Activity Feed & Threshold Reference Row -->
+    <div class="bottom-row">
+      <!-- Recent Activity Feed -->
+      <div class="activity-card">
+        <div class="card-header">
+          <div class="title-with-icon">
+            <span class="icon">⚡</span>
+            <h3>Recent System Activity</h3>
+          </div>
+          <a routerLink="/requests" class="link-view-all">View All →</a>
+        </div>
+
+        <div class="activity-list">
+          <div class="activity-row" *ngFor="let act of recentActivities">
+            <div class="act-icon">
+              {{ getTypeIcon(act.request_type) }}
+            </div>
+            <div class="act-details">
+              <a [routerLink]="['/requests', act.id]" class="act-id">{{ act.request_number }}</a>
+              <span class="act-user">by {{ act.requested_by }}</span>
+            </div>
+            <div class="act-amount">₹{{ act.amount | number:'1.2-2' }}</div>
+            <div class="act-status">
+              <span class="status-badge" [ngClass]="getStatusBadgeClass(act.status)">
+                {{ act.status.replace('_', ' ') }}
+              </span>
+            </div>
+          </div>
+
+          <div class="empty-state-mini" *ngIf="recentActivities.length === 0">
+            <p>No recent activity logged yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 4 & 5 Overview -->
+      <div class="roadmap-card">
+        <div class="card-header">
+          <div class="title-with-icon">
+            <span class="icon">🎯</span>
+            <h3>Build Roadmap Status</h3>
+          </div>
+        </div>
+
+        <div class="stage-status-list">
+          <div class="stage-item completed">
+            <span class="check-circle">✓</span>
+            <div>
+              <strong>Stage 1: Foundation &amp; Auth</strong>
+              <p>JWT auth, Bcrypt, role guards &amp; PostgreSQL schemas.</p>
+            </div>
+          </div>
+
+          <div class="stage-item completed">
+            <span class="check-circle">✓</span>
+            <div>
+              <strong>Stage 2: Financial Requests</strong>
+              <p>Draft state, amounts, submission, and validation.</p>
+            </div>
+          </div>
+
+          <div class="stage-item completed">
+            <span class="check-circle">✓</span>
+            <div>
+              <strong>Stage 3: Multi-Level Approval</strong>
+              <p>Manager → Finance → Director routing, reasons &amp; audit history.</p>
+            </div>
+          </div>
+
+          <div class="stage-item active">
+            <span class="check-circle active-circle">4</span>
+            <div>
+              <strong>Stage 4: Dashboard &amp; Reports (Live)</strong>
+              <p>KPI telemetry, category charts, filters &amp; CSV export.</p>
+            </div>
+          </div>
+
+          <div class="stage-item upcoming">
+            <span class="check-circle pending-circle">5</span>
+            <div>
+              <strong>Stage 5: Polish &amp; Deployment</strong>
+              <p>Production readiness, end-to-end testing &amp; documentation.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

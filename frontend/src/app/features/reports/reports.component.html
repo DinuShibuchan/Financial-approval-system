@@ -1,0 +1,178 @@
+<div class="reports-layout">
+  <!-- Header Section -->
+  <div class="header-section">
+    <div>
+      <div class="breadcrumbs">
+        <a routerLink="/dashboard">Dashboard</a>
+        <span>/</span>
+        <span class="active">Financial Reports &amp; Analytics</span>
+      </div>
+      <h1>Expenditure Reports &amp; Audit Logs</h1>
+      <p class="subtitle">Multi-dimensional filtering, amount threshold grouping, and data exports</p>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn-export" (click)="exportCsv()" [disabled]="requests.length === 0">
+        <span>📥 Download CSV Export</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter Card -->
+  <div class="filter-card">
+    <div class="filter-grid">
+      <!-- Date Range -->
+      <div class="filter-group">
+        <label for="startDate">From Date</label>
+        <input type="date" id="startDate" [(ngModel)]="filter.start_date" />
+      </div>
+
+      <div class="filter-group">
+        <label for="endDate">To Date</label>
+        <input type="date" id="endDate" [(ngModel)]="filter.end_date" />
+      </div>
+
+      <!-- Category Filter -->
+      <div class="filter-group">
+        <label for="reportType">Category</label>
+        <select id="reportType" [(ngModel)]="filter.type">
+          <option value="ALL">All Categories</option>
+          <option value="EXPENSE">💳 Expense</option>
+          <option value="PURCHASE">🛍️ Purchase</option>
+          <option value="TRAVEL">✈️ Travel</option>
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div class="filter-group">
+        <label for="reportStatus">Approval Status</label>
+        <select id="reportStatus" [(ngModel)]="filter.status">
+          <option value="ALL">All Statuses</option>
+          <option value="APPROVED">✅ Approved</option>
+          <option value="PENDING_APPROVAL">⏳ Pending Approval</option>
+          <option value="REJECTED">❌ Rejected</option>
+          <option value="DRAFT">📝 Draft</option>
+          <option value="CANCELLED">🚫 Cancelled</option>
+        </select>
+      </div>
+
+      <!-- Min Amount -->
+      <div class="filter-group">
+        <label for="minAmount">Min Amount (₹)</label>
+        <input type="number" id="minAmount" [(ngModel)]="filter.min_amount" placeholder="0" />
+      </div>
+
+      <!-- Max Amount -->
+      <div class="filter-group">
+        <label for="maxAmount">Max Amount (₹)</label>
+        <input type="number" id="maxAmount" [(ngModel)]="filter.max_amount" placeholder="No limit" />
+      </div>
+    </div>
+
+    <div class="filter-actions">
+      <button class="btn-reset" (click)="resetFilters()">
+        Reset
+      </button>
+      <button class="btn-apply" (click)="runReport()">
+        🔍 Apply Filters
+      </button>
+    </div>
+  </div>
+
+  <!-- Analytics KPI Bar -->
+  <div class="kpi-bar" *ngIf="!isLoading">
+    <div class="kpi-mini">
+      <span class="label">Filtered Matches</span>
+      <span class="val">{{ requests.length }} records</span>
+    </div>
+
+    <div class="kpi-mini">
+      <span class="label">Cumulative Amount</span>
+      <span class="val highlight-emerald">₹{{ totalAmount | number:'1.2-2' }}</span>
+    </div>
+
+    <div class="kpi-mini">
+      <span class="label">Average Expenditure</span>
+      <span class="val">₹{{ averageAmount | number:'1.0-0' }}</span>
+    </div>
+
+    <div class="kpi-mini">
+      <span class="label">Authorized Ratio</span>
+      <span class="val highlight-purple">
+        {{ requests.length > 0 ? ((approvedCount / requests.length) * 100 | number:'1.0-0') : 0 }}%
+      </span>
+    </div>
+  </div>
+
+  <!-- Error Alert -->
+  <div class="alert-box" *ngIf="errorMessage">
+    <span>⚠️</span> {{ errorMessage }}
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="spinner-large"></div>
+    <p>Generating reports data...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-card" *ngIf="!isLoading && requests.length === 0">
+    <div class="empty-icon">📊</div>
+    <h3>No records match your report criteria</h3>
+    <p>Try widening your date range or removing amount thresholds.</p>
+    <button class="btn-reset" (click)="resetFilters()">
+      Reset Filters
+    </button>
+  </div>
+
+  <!-- Report Data Table -->
+  <div class="table-container" *ngIf="!isLoading && requests.length > 0">
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>Request #</th>
+          <th>Date</th>
+          <th>Requested By</th>
+          <th>Category</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Level</th>
+          <th>Description</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of requests">
+          <td class="col-num">
+            <a [routerLink]="['/requests', r.id]" class="req-link">{{ r.request_number }}</a>
+          </td>
+          <td class="col-date">{{ r.created_at | date:'mediumDate' }}</td>
+          <td>{{ r.requested_by_name || 'User #' + r.requested_by }}</td>
+          <td>
+            <span class="type-pill">
+              {{ getTypeIcon(r.request_type) }} {{ r.request_type }}
+            </span>
+          </td>
+          <td class="col-amount">₹{{ r.amount | number:'1.2-2' }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusBadgeClass(r.status)">
+              {{ r.status.replace('_', ' ') }}
+            </span>
+          </td>
+          <td>
+            <span *ngIf="r.status === 'PENDING_APPROVAL'" class="level-tag">
+              L{{ r.current_approval_level }}
+            </span>
+            <span *ngIf="r.status !== 'PENDING_APPROVAL'" class="level-dim">—</span>
+          </td>
+          <td class="col-desc">{{ r.description }}</td>
+          <td class="text-right">
+            <a [routerLink]="['/requests', r.id]" class="btn-view" title="View Details">
+              👁️
+            </a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -1,0 +1,232 @@
+<div class="requests-layout">
+  <!-- Top Navigation & Action Header -->
+  <div class="header-section">
+    <div class="header-titles">
+      <div class="breadcrumbs">
+        <a routerLink="/dashboard">Dashboard</a>
+        <span>/</span>
+        <span class="active">Financial Requests</span>
+      </div>
+      <h1>Financial Requests</h1>
+      <p class="subtitle">Track, submit, and oversee reimbursement and purchase authorization lifecycles</p>
+    </div>
+
+    <div class="header-actions">
+      <a routerLink="/requests/new" class="btn-create">
+        <span class="plus-icon">+</span>
+        <span>New Request</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Scope Tabs (My vs All) -->
+  <div class="tabs-bar">
+    <div class="tab-group">
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab === 'my'"
+        (click)="switchTab('my')">
+        <span>👤 My Requests</span>
+      </button>
+
+      <button 
+        *ngIf="authService.hasAnyRole(['MANAGER', 'FINANCE', 'DIRECTOR'])"
+        class="tab-btn" 
+        [class.active]="activeTab === 'all'"
+        (click)="switchTab('all')">
+        <span>🌐 All Organization Requests</span>
+      </button>
+    </div>
+
+    <!-- Search input -->
+    <div class="search-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input 
+        type="text" 
+        placeholder="Search by ID, desc, or user..." 
+        [(ngModel)]="searchQuery"
+        (input)="applyFilters()" />
+    </div>
+  </div>
+
+  <!-- Status Filter Pills -->
+  <div class="filters-row">
+    <div class="filter-pills">
+      <button 
+        class="pill-btn" 
+        [class.active]="selectedStatus === 'ALL'"
+        (click)="filterByStatus('ALL')">
+        All
+      </button>
+      <button 
+        class="pill-btn" 
+        [class.active]="selectedStatus === 'DRAFT'"
+        (click)="filterByStatus('DRAFT')">
+        📝 Drafts
+      </button>
+      <button 
+        class="pill-btn" 
+        [class.active]="selectedStatus === 'PENDING_APPROVAL'"
+        (click)="filterByStatus('PENDING_APPROVAL')">
+        ⏳ Pending
+      </button>
+      <button 
+        class="pill-btn" 
+        [class.active]="selectedStatus === 'APPROVED'"
+        (click)="filterByStatus('APPROVED')">
+        ✅ Approved
+      </button>
+      <button 
+        class="pill-btn" 
+        [class.active]="selectedStatus === 'REJECTED'"
+        (click)="filterByStatus('REJECTED')">
+        ❌ Rejected
+      </button>
+      <button 
+        class="pill-btn" 
+        [class.active]="selectedStatus === 'CANCELLED'"
+        (click)="filterByStatus('CANCELLED')">
+        🚫 Cancelled
+      </button>
+    </div>
+
+    <div class="type-filter">
+      <select [(ngModel)]="selectedType" (change)="applyFilters()">
+        <option value="ALL">All Categories</option>
+        <option value="EXPENSE">💳 Expense</option>
+        <option value="PURCHASE">🛍️ Purchase</option>
+        <option value="TRAVEL">✈️ Travel</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Error Alert -->
+  <div class="error-alert" *ngIf="errorMessage">
+    <span>⚠️</span> {{ errorMessage }}
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="spinner-large"></div>
+    <p>Loading financial requests...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-card" *ngIf="!isLoading && filteredRequests.length === 0">
+    <div class="empty-icon">📂</div>
+    <h3>No financial requests found</h3>
+    <p *ngIf="searchQuery || selectedStatus !== 'ALL' || selectedType !== 'ALL'">
+      Try adjusting your search criteria or filters.
+    </p>
+    <p *ngIf="!searchQuery && selectedStatus === 'ALL' && selectedType === 'ALL'">
+      You haven't initiated any financial requests yet. Click below to start your first one!
+    </p>
+    <a routerLink="/requests/new" class="btn-create" *ngIf="!searchQuery && selectedStatus === 'ALL'">
+      + Create Your First Request
+    </a>
+  </div>
+
+  <!-- Requests Table / List -->
+  <div class="table-container" *ngIf="!isLoading && filteredRequests.length > 0">
+    <table class="requests-table">
+      <thead>
+        <tr>
+          <th>Request #</th>
+          <th>Category</th>
+          <th>Requested By</th>
+          <th>Amount</th>
+          <th>Current Status</th>
+          <th>Approval Level</th>
+          <th>Date</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let req of filteredRequests">
+          <td class="col-req-num">
+            <a [routerLink]="['/requests', req.id]" class="req-link">
+              {{ req.request_number }}
+            </a>
+          </td>
+
+          <td>
+            <span class="type-tag">
+              <span class="type-emoji">{{ getTypeIcon(req.request_type) }}</span>
+              <span>{{ req.request_type }}</span>
+            </span>
+          </td>
+
+          <td>
+            <div class="user-cell">
+              <span class="user-avatar">{{ (req.requested_by_name || 'U').charAt(0) }}</span>
+              <span class="user-fullname">{{ req.requested_by_name || 'User #' + req.requested_by }}</span>
+            </div>
+          </td>
+
+          <td class="col-amount">
+            ₹{{ req.amount | number:'1.2-2' }}
+          </td>
+
+          <td>
+            <span class="status-badge" [ngClass]="getStatusBadgeClass(req.status)">
+              <span class="status-dot"></span>
+              {{ req.status.replace('_', ' ') }}
+            </span>
+          </td>
+
+          <td>
+            <div class="level-indicator" *ngIf="req.status === 'PENDING_APPROVAL'">
+              <span class="level-badge" [ngClass]="'lvl-' + req.current_approval_level">
+                Level {{ req.current_approval_level }}
+              </span>
+              <span class="level-role">
+                {{ req.current_approval_level === 1 ? 'Manager' : (req.current_approval_level === 2 ? 'Finance' : 'Director') }}
+              </span>
+            </div>
+            <span class="level-none" *ngIf="req.status !== 'PENDING_APPROVAL'">
+              {{ req.status === 'APPROVED' ? 'Completed' : '—' }}
+            </span>
+          </td>
+
+          <td class="col-date">
+            {{ req.created_at | date:'mediumDate' }}
+          </td>
+
+          <td class="text-right col-actions">
+            <div class="action-btn-group">
+              <!-- View Detail -->
+              <a [routerLink]="['/requests', req.id]" class="btn-action" title="View details">
+                👁️
+              </a>
+
+              <!-- Owner Draft actions: Edit, Submit, Delete -->
+              <ng-container *ngIf="req.status === 'DRAFT' && isOwner(req)">
+                <a [routerLink]="['/requests', req.id, 'edit']" class="btn-action btn-edit" title="Edit draft">
+                  ✏️
+                </a>
+                <button (click)="submitDraft(req.id)" class="btn-action btn-submit" title="Submit now">
+                  🚀
+                </button>
+                <button (click)="deleteDraft(req.id)" class="btn-action btn-delete" title="Delete draft">
+                  🗑️
+                </button>
+              </ng-container>
+
+              <!-- Owner Pending action: Cancel -->
+              <button 
+                *ngIf="req.status === 'PENDING_APPROVAL' && isOwner(req)" 
+                (click)="cancelRequest(req.id)" 
+                class="btn-action btn-cancel" 
+                title="Cancel request">
+                🚫
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
